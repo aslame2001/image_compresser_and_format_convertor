@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,11 +76,35 @@
             padding: 5px;
             margin-top: 10px;
         }
+        .loading {
+    display: none;
+    text-align: center;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); 
+}
+        .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <h1>Upload Images with Options</h1>
-    <form action="controller/process.php" method="POST" enctype="multipart/form-data">
+    <form id="uploadForm" enctype="multipart/form-data">
         <div class="upload-container">
             <label for="imageInput">Choose Images</label>
             <input type="file" id="imageInput" name="images[]" multiple accept="image/*">
@@ -122,6 +145,16 @@
         </div>
     </form>
 
+    <div class="loading" id="loading">
+        <img src="https://i.gifer.com/YCZH.gif" alt="Loading..."> 
+    </div>
+
+    <div class="popup" id="popup">
+        <div id="popupMessage"></div>
+        <button id="popupCloseBtn">Close</button>
+        <a href="" id="downloadBtn" style="display: none;">Download File</a>
+    </div>
+
     <script>
         const imageInput = document.getElementById("imageInput");
         const previewContainer = document.getElementById("previewContainer");
@@ -129,10 +162,15 @@
         const formatOptions = document.getElementById("formatOptions");
         const compressCheckbox = document.getElementById("compressCheckbox");
         const compressionOptions = document.getElementById("compressionOptions");
+        const uploadForm = document.getElementById("uploadForm");
+        const loading = document.getElementById("loading");
+        const popup = document.getElementById("popup");
+        const popupMessage = document.getElementById("popupMessage");
+        const popupCloseBtn = document.getElementById("popupCloseBtn");
+        const downloadBtn = document.getElementById("downloadBtn");
 
         let uploadedImages = [];
 
-        // Handle file input change
         imageInput.addEventListener("change", (event) => {
             const files = Array.from(event.target.files);
 
@@ -142,32 +180,25 @@
                     reader.onload = (e) => {
                         const imageSrc = e.target.result;
 
-                        // Add image to the array
                         uploadedImages.push({ name: file.name, src: imageSrc });
 
-                        // Render the preview
                         renderPreviews();
                     };
                     reader.readAsDataURL(file);
                 }
             });
-
-            //event.target.value = ""; // Clear file input
         });
 
-        // Render image previews
         function renderPreviews() {
-            previewContainer.innerHTML = ""; // Clear previews
+            previewContainer.innerHTML = "";
 
             uploadedImages.forEach((image, index) => {
                 const previewDiv = document.createElement("div");
                 previewDiv.classList.add("image-preview");
 
-                // Image element
                 const img = document.createElement("img");
                 img.src = image.src;
 
-                // Remove button
                 const removeButton = document.createElement("button");
                 removeButton.innerHTML = "&times;";
                 removeButton.addEventListener("click", () => removeImage(index));
@@ -179,20 +210,54 @@
             });
         }
 
-        // Remove image
         function removeImage(index) {
-            uploadedImages.splice(index, 1); // Remove the image from the array
-            renderPreviews(); // Re-render the previews
+            uploadedImages.splice(index, 1);
+            renderPreviews();
         }
 
-        // Toggle format dropdown when "Convert" checkbox is clicked
         convertCheckbox.addEventListener("change", (event) => {
             formatOptions.style.display = event.target.checked ? "block" : "none";
         });
 
-        // Toggle compression rate dropdown when "Compress" checkbox is clicked
         compressCheckbox.addEventListener("change", (event) => {
             compressionOptions.style.display = event.target.checked ? "block" : "none";
+        });
+
+        uploadForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        loading.style.display = "block";
+
+        const formData = new FormData(uploadForm);
+
+        fetch("controller/process.php", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            loading.style.display = "none";
+
+            if (data.success) {
+                popupMessage.textContent = "Upload successful!";
+                downloadBtn.style.display = "block";
+                downloadBtn.href = 'controller/' + data.fileLink; 
+            } else {
+                popupMessage.textContent = "Upload failed: " + data.message;
+                downloadBtn.style.display = "none";
+            }
+
+            popup.style.display = "block";
+        })
+        .catch(error => {
+            loading.style.display = "none";
+            popupMessage.textContent = "An error occurred: " + error.message;
+            popup.style.display = "block";
+        });
+    });
+
+        popupCloseBtn.addEventListener("click", () => {
+            popup.style.display = "none";
         });
     </script>
 </body>
