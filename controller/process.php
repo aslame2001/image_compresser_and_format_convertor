@@ -5,8 +5,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors = [];
     $uploadedImages = [];
     $zip = new ZipArchive();
-
     $uploadDir = 'uploads/';
+    
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -14,7 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $zipFileName = $uploadDir . 'images_' . uniqid() . '.zip';
 
     if ($zip->open($zipFileName, ZipArchive::CREATE) !== TRUE) {
-        die("Unable to create zip file. Please check the directory permissions.");
+        echo json_encode(['success' => false, 'message' => 'Unable to create zip file.']);
+        exit;
     }
 
     if (isset($_FILES['images']) && !empty($_FILES['images']['name'][0])) {
@@ -53,9 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         continue 2;
                 }
 
-                // Compression
+
                 if ($compress) {
-                    $compressionQuality = 100 - $compressionRate; // Adjust based on input rate
+                    $compressionQuality = 100 - $compressionRate;
 
                     switch ($imageInfo['mime']) {
                         case 'image/jpeg':
@@ -75,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     move_uploaded_file($imageTmpName, "uploads/$newImageName");
                 }
 
-                // Convert if needed
+
                 if ($convert) {
                     $convertedImageName = uniqid('', true) . '.' . $format;
 
@@ -90,37 +91,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             imagegif($image, "uploads/$convertedImageName"); 
                             break;
                         case 'webp':
-                            imagewebp($image, "uploads/$convertedImageName", 100); 
+                            imagewebp($image, "uploads/$convertedImageName"); 
                             break;
-                        default:
-                            $errors[] = "Invalid format for conversion: $format";
-                            continue 2;
                     }
 
-                    // Update the name to the converted image
+                    unlink("uploads/$newImageName");
                     $newImageName = $convertedImageName;
                 }
 
-                // Add image to zip
                 $zip->addFile("uploads/$newImageName", $newImageName);
-                $uploadedImages[] = "uploads/$newImageName";
+                $uploadedImages[] = $newImageName;
+
                 imagedestroy($image);
             } else {
-                $errors[] = "Error uploading $imageName.";
+                $errors[] = "Error uploading image: $imageName";
             }
         }
 
         $zip->close();
+
         if (empty($errors)) {
-            echo "Images uploaded, compressed, and converted into a ZIP file successfully!<br>";
-            echo "Download the zip file: <a href='$zipFileName' download>Click here</a>";
+            echo json_encode([
+                'success' => true,
+                'fileLink' => $zipFileName
+            ]);
         } else {
-            foreach ($errors as $error) {
-                echo "<p style='color: red;'>$error</p>";
-            }
+            echo json_encode([
+                'success' => false,
+                'message' => implode(', ', $errors)
+            ]);
         }
     } else {
-        echo "<p style='color: red;'>No files uploaded. Please try again.</p>";
+        echo json_encode(['success' => false, 'message' => 'No images uploaded.']);
     }
 }
 ?>
